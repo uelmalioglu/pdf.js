@@ -1780,6 +1780,9 @@ class CanvasGraphics {
             current.updateRectMinMax(currentTransform, [x, y, xw, yh]);
           }
           ctx.closePath();
+          if ("JotformCanvasMiddleWare" in ctx) {
+            ctx.JotformCanvasMiddleWare.process("rect", [x, y, xw, yh], ctx);
+          }
           break;
         case OPS.moveTo:
           x = args[j++];
@@ -1790,9 +1793,15 @@ class CanvasGraphics {
           }
           break;
         case OPS.lineTo:
+          const startx = x;
+          const starty = y;
           x = args[j++];
           y = args[j++];
           ctx.lineTo(x, y);
+          if ("JotformCanvasMiddleWare" in ctx) {
+            const line = [startx, starty, x, y];
+            ctx.JotformCanvasMiddleWare.process("line", line, ctx);
+          }
           if (!isScalingMatrix) {
             current.updatePathMinMax(currentTransform, x, y);
           }
@@ -1948,6 +1957,10 @@ class CanvasGraphics {
       } else {
         ctx.fill();
       }
+    }
+
+    if ("JotformCanvasMiddleWare" in ctx) {
+      ctx.JotformCanvasMiddleWare.process("fill", fillColor);
     }
 
     if (needRestore) {
@@ -2990,7 +3003,7 @@ class CanvasGraphics {
       return;
     }
 
-    this.paintInlineImageXObject(imgData);
+    this.paintInlineImageXObject(imgData, objId);
   }
 
   paintImageXObjectRepeat(objId, scaleX, scaleY, positions) {
@@ -3018,7 +3031,7 @@ class CanvasGraphics {
     this.paintInlineImageXObjectGroup(imgData, map);
   }
 
-  paintInlineImageXObject(imgData) {
+  paintInlineImageXObject(imgData, objId = null) {
     if (!this.contentVisible) {
       return;
     }
@@ -3070,11 +3083,29 @@ class CanvasGraphics {
       height
     );
 
-    if (this.imageLayer) {
-      const [left, top] = Util.applyTransform(
-        [0, -height],
-        getCurrentTransform(this.ctx)
+    const currentTransform = getCurrentTransformInverse(ctx);
+
+    const [left, top] = Util.applyTransform(
+      [0, -height],
+      getCurrentTransform(ctx)
+    );
+    // const position = this.getCanvasPosition(0, 0);
+
+    if ("JotformCanvasMiddleWare" in ctx) {
+      ctx.JotformCanvasMiddleWare.process(
+        "image",
+        {
+          image: imgToPaint,
+          left,
+          top,
+          width: width / currentTransform[0],
+          height: height / currentTransform[3],
+        },
+        ctx
       );
+    }
+
+    if (this.imageLayer) {
       this.imageLayer.appendImage({
         imgData,
         left,
@@ -3312,6 +3343,10 @@ class CanvasGraphics {
 
     ctx.stroke();
 
+    if ("JotformCanvasMiddleWare" in ctx) {
+      ctx.JotformCanvasMiddleWare.process("stroke", this.current.strokeColor);
+    }
+
     if (saveRestore) {
       ctx.setTransform(...savedMatrix);
       ctx.setLineDash(savedDashes);
@@ -3326,6 +3361,14 @@ class CanvasGraphics {
       }
     }
     return true;
+  }
+
+  getCanvasPosition(ctx, x, y) {
+    const transform = getCurrentTransform(ctx);
+    return [
+      transform[0] * x + transform[2] * y + transform[4],
+      transform[1] * x + transform[3] * y + transform[5],
+    ];
   }
 }
 

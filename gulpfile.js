@@ -2341,7 +2341,7 @@ gulp.task(
 gulp.task(
   "dist",
   gulp.series("dist-pre", function createDist(done) {
-    const VERSION = getVersionJSON().version;
+    /* const VERSION = getVersionJSON().version;
 
     console.log();
     console.log("### Committing changes");
@@ -2374,7 +2374,7 @@ gulp.task(
     console.log(
       "  cd " + DIST_DIR + "; git push --tags " + DIST_REPO_URL + " master"
     );
-    console.log();
+    console.log(); */
     done();
   })
 );

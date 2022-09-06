@@ -1549,6 +1549,9 @@ class WidgetAnnotation extends Annotation {
     };
 
     data.fieldFlags = getInheritableProperty({ dict, key: "Ff" });
+    // eslint-disable-next-line prettier/prettier
+    data.annotationActions = this.getParsedAnnotationActions(dict);
+
     if (!Number.isInteger(data.fieldFlags) || data.fieldFlags < 0) {
       data.fieldFlags = 0;
     }
@@ -2229,6 +2232,18 @@ class WidgetAnnotation extends Annotation {
 
   getFieldObject() {
     return null;
+  }
+
+  getParsedAnnotationActions(dict) {
+    const AADict = getInheritableProperty({ dict, key: "AA" });
+    if (AADict) {
+      const AAFDict = getInheritableProperty({ dict: AADict, key: "F" });
+      if (AAFDict) {
+        const JSValue = getInheritableProperty({ dict: AAFDict, key: "JS" });
+        return JSValue || false;
+      }
+    }
+    return false;
   }
 }
 

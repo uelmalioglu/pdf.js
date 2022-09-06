@@ -2375,7 +2375,16 @@ class PartialEvaluator {
     const emptyXObjectCache = new LocalImageCache();
     const emptyGStateCache = new LocalGStateCache();
 
-    const preprocessor = new EvaluatorPreprocessor(stream, xref, stateManager);
+    // eslint-disable-next-line max-len
+    // const preprocessor = new EvaluatorPreprocessor(stream, xref, stateManager);
+
+    const preprocessor = new CustomEvaluatorPreprocessor(
+      stream,
+      xref,
+      stateManager,
+      resources,
+      this.pdfFunctionFactory
+    );
 
     let textState;
 
@@ -2425,6 +2434,16 @@ class PartialEvaluator {
         };
       }
       textContentItem.fontName = loadedName;
+
+      // JotForm
+      // We pass some font info for text chunk with getTextContent(),
+      // in order to find bold, italic text etc.
+      textContentItem.font = {
+        name: font.name,
+        fallbackName: font.fallbackName,
+        bold: font.bold,
+        black: font.black,
+      };
 
       const trm = (textContentItem.transform = getCurrentTextTransform());
       if (!font.vertical) {
@@ -2505,6 +2524,8 @@ class PartialEvaluator {
         transform: textChunk.transform,
         fontName: textChunk.fontName,
         hasEOL: textChunk.hasEOL,
+        color: stateManager.state.fillColor,
+        font: textChunk.font,
       };
     }
 
@@ -4929,4 +4950,59 @@ class EvaluatorPreprocessor {
   }
 }
 
-export { EvaluatorPreprocessor, PartialEvaluator };
+class CustomEvaluatorPreprocessor extends EvaluatorPreprocessor {
+  constructor(stream, xref, stateManager, resources, pdfFunctionFactory) {
+    super(stream, xref, stateManager);
+
+    try {
+      this.resources = resources;
+      this.xref = xref;
+      this.pdfFunctionFactory = pdfFunctionFactory;
+
+      const state = this.stateManager.state;
+      state.textRenderingMode = TextRenderingMode.FILL;
+      state.fillColorSpace = ColorSpace.singletons.gray;
+      state.fillColor = [0, 0, 0];
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
+  preprocessCommand(fn, args) {
+    try {
+      super.preprocessCommand(fn, args);
+      const state = this.stateManager.state;
+
+      switch (fn) {
+        case OPS.setFillColorSpace:
+          state.fillColorSpace = ColorSpace.parse(
+            args[0],
+            this.xref,
+            this.resources,
+            this.pdfFunctionFactory
+          );
+          break;
+        case OPS.setFillColor:
+          var cs = state.fillColorSpace;
+          state.fillColor = cs.getRgb(args, 0);
+          break;
+        case OPS.setFillGray:
+          state.fillColorSpace = ColorSpace.singletons.gray;
+          state.fillColor = ColorSpace.singletons.gray.getRgb(args, 0);
+          break;
+        case OPS.setFillCMYKColor:
+          state.fillColorSpace = ColorSpace.singletons.cmyk;
+          state.fillColor = ColorSpace.singletons.cmyk.getRgb(args, 0);
+          break;
+        case OPS.setFillRGBColor:
+          state.fillColorSpace = ColorSpace.singletons.rgb;
+          state.fillColor = ColorSpace.singletons.rgb.getRgb(args, 0);
+          break;
+      }
+    } catch (e) {
+      warn(`CustomEvaluator error: ${e}`);
+    }
+  }
+}
+
+export { CustomEvaluatorPreprocessor, EvaluatorPreprocessor, PartialEvaluator };
